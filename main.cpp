@@ -85,7 +85,6 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 uint16_t threadCount = 0;
 bool freeThreadSlots[EXPECTED_CLIENTS];
 
-
 /**
  * Sensor struct with all the info for the sensors
  */
@@ -99,15 +98,14 @@ struct Sensors_s {
     uint32_t counter;
     bool isActive;
 };
-Sensors_s sensorList[SENSOR_AMOUNT];
-
+Sensors_s sensorList[SENSOR_AMOUNT];//List of sensors
 
 /**
  * Data needed for the client threads.
  * Mostly used to send debug responses.
  */
 struct ClientData_s {
-    int socketDescripter;
+    int socketDescripter;//The socket used to communicate with the client
     uint8_t threadId;
     struct sockaddr_in clientAddr;
 
@@ -117,6 +115,7 @@ struct ClientData_s {
 //______________ From the Internet!!!! ________________
 //http://coliru.stacked-crooked.com/a/652f29c0500cf195) 
 //http://stackoverflow.com/questions/53849/how-do-i-tokenize-a-string-in-c
+
 void tokenize(std::string str, std::vector<string> &token_v) {
     size_t start = str.find_first_not_of(DELIMITER), end = start;
 
@@ -128,7 +127,7 @@ void tokenize(std::string str, std::vector<string> &token_v) {
         // Skip all occurences of the delimiter to find new start
         start = str.find_first_not_of(DELIMITER, end);
     }
-} 
+}
 //========== FROM INTERNET END =================
 
 /**
@@ -192,16 +191,15 @@ const string getTime() {
     //========== FROM INTERNET END =================
 }
 
-
 /**
  * This is to be able to handle more than one client at the time.
  * 
  * 
  * This is the thread a clients gets when she is connected to this server. 
- * It takes the commands described in the "REMOTE_USAGE". 
- * It will keep the connection until client disconnect or get a cmd to shut 
+ * It handles the commands described in the "REMOTE_USAGE". 
+ * It will keep the connection up until client disconnect or get a cmd to shut 
  * down by the client user. 
- * It will check the inputs from the user and act accordingly. 
+ * It will check the inputs from the client user and act accordingly. 
  * @param void *clientSocket struct (info about this client)
  * @return void * (nothing)
  */
@@ -209,15 +207,15 @@ void *clientHandlerThread(void *clientSocket) {
 
     bool keepAlive = true;
     stringstream log; //Not used 
-    stringstream converter;//For converting strings to numbers and vice versa
-    vector<string> rxStrings_v;//Hold the cmd's after they have bean tokenized
-    string rxString;//For converting the char buf to string so it can be tokenized (easer than going through the buf byte by byte :-D)
-    string txMsg;//Msg to send
-    char rxBuffer [RX_BUFFER_SIZE];//For holding the incoming bytes 
+    stringstream converter; //For converting strings to numbers and vice versa
+    vector<string> rxStrings_v; //Hold the cmd's after they have bean tokenized
+    string rxString; //For converting the char buf to string so it can be tokenized (easer than going through the buf byte by byte :-D)
+    string txMsg; //Msg to send
+    char rxBuffer [RX_BUFFER_SIZE]; //For holding the incoming bytes 
 
-    struct ClientData_s *thisClientData;//To get the clientSocket out from the void*
+    struct ClientData_s *thisClientData; //To get the clientSocket out from the void*
 
-    thisClientData = (struct ClientData_s *) clientSocket;//Get the data from the void*
+    thisClientData = (struct ClientData_s *) clientSocket; //Get the data from the void*
 
     while (keepAlive) {
         //Clear all containers 
@@ -230,7 +228,7 @@ void *clientHandlerThread(void *clientSocket) {
 
         //Wait for incoming bytes from the client user 
         ssize_t bytesRx = recv(thisClientData->socketDescripter, rxBuffer, RX_BUFFER_SIZE, NO_FLAGS);
-        
+
         // ________ Error checking _________
         //This should go to a log stream and then to a file. (In the future)
         if (bytesRx == 0) {
@@ -250,12 +248,12 @@ void *clientHandlerThread(void *clientSocket) {
         int threadId = thisClientData->threadId;
         converter << threadId;
         txMsg += "Hello '";
-        txMsg += inet_ntoa(thisClientData->clientAddr.sin_addr);//Get readable IP address
+        txMsg += inet_ntoa(thisClientData->clientAddr.sin_addr); //Get readable IP address
         txMsg += "' you have client thread:" + converter.str() + ENDL;
 #endif
 
-        rxString.append(rxBuffer);//Convert char buf to string for tokenizer
-        tokenize(rxString, rxStrings_v);//Tokenize the incoming data string
+        rxString.append(rxBuffer); //Convert char buf to string for tokenizer
+        tokenize(rxString, rxStrings_v); //Tokenize the incoming data string
 
         //This section will go through the incoming data and act according to 
         //any cmd's send by the client user. It will also check for validity 
@@ -264,42 +262,42 @@ void *clientHandlerThread(void *clientSocket) {
         //tested thoroughly and has not failed yet, but never say never! It is 
         //not beautiful with that big for-loop, but because it's inside a thread 
         //its easy than making many thread safe functions. 
-        if (rxStrings_v.at(0) != TM20_CMD) {
+        if (rxStrings_v.at(0) != TM20_CMD) {//Check for TM20 cmd
             txMsg += "ERROR: No 'TM20' cmd received" + ENDL;
             txMsg += REMOTE_USAGE;
         } else {
-            for (uint8_t i = 1; i < rxStrings_v.size(); i++) {
+            for (uint8_t i = 1; i < rxStrings_v.size(); i++) {//Go through all incoming cmds/sub-strings
 
                 if (rxStrings_v[i] == GET_SONSOR_AMOUNT) {
 
                     txMsg += SENSOR_AMOUNT_STR + " Sensors are attached to this board" + ENDL;
                     txMsg += "Sensors are:" + ENDL;
-                    for (uint8_t i = 0; i < SENSOR_AMOUNT; i++) {
+                    for (uint8_t i = 0; i < SENSOR_AMOUNT; i++) {//Get all info about all sensors
                         txMsg += "Name: " + sensorList[i].sensorName;
                         txMsg += " is No: " + sensorList[i].sensorNo_str;
                         txMsg += ENDL;
                     }
-
                 } else if (rxStrings_v[i] == READ_SENSOR_NO) {
-                    i++;
-                    if (i < rxStrings_v.size()) {//Safety first !!
-                        stringstream converter(rxStrings_v.at(i));
-                        int sensorNo;
-                        if (converter >> sensorNo) {
-                            stringstream tempConv;
-                            tempConv << sensorList[sensorNo].sensorValue;
+                    i++;//Jump to next string 
+                    if (i < rxStrings_v.size()) {// Make sure the string exists. Safety first !!
+                        stringstream converter(rxStrings_v.at(i));//For converting string to number 
+                        int sensorNo;//The number (USE INTS!!! UINT_T DONT WORK. IMPORTANT!!!)
+                        if (converter >> sensorNo) {//Try to convert
+                            stringstream tempConv;//New converter for sensor value. Number to string
+                            tempConv << sensorList[sensorNo].sensorValue;//We know its a number no need to check :-)
                             txMsg += "Sensor name: " + sensorList[sensorNo].sensorName;
                             txMsg += "Sensor No: " + sensorList[sensorNo].sensorNo_str;
                             txMsg += " Reads: ";
-                            txMsg += tempConv.str();
+                            txMsg += tempConv.str();//The sensor value 
                             txMsg += " Sampled: " + sensorList[sensorNo].timeStamp;
-                        } else {
+                            txMsg += ENDL;
+                        } else {//Make Error massage
                             txMsg += "ERROR: Read sensor '" + rxStrings_v[i] +
                                     "' is not a number! Pull yourself together!" + ENDL + ENDL;
                             txMsg += REMOTE_USAGE;
                             break;
                         }
-                    } else {
+                    } else {//Make Error massage
                         txMsg += "ERROR: Need a sensor number to read! What is wrong with you!" + ENDL + ENDL;
                         txMsg += REMOTE_USAGE;
                         break;
@@ -307,12 +305,12 @@ void *clientHandlerThread(void *clientSocket) {
                 } else if (rxStrings_v[i] == CLOSE_CONNECTION) {
                     txMsg += "Closing connection from server side. "
                             "Thank you for participating. See you next time! :-D" + ENDL;
-                    keepAlive = false;
+                    keepAlive = false;//Close connection --> thread will close aswell 
                 } else if (rxStrings_v[i] == MAKE_UPPERCASE) {
                     ++i; //make next string to upper case 
                     if (i < rxStrings_v.size()) {//Safety first !!
                         txMsg += "ECHO '" + rxStrings_v[i] + "' To upper: ";
-                        for (uint8_t ch = 0; ch < rxStrings_v[i].length(); ch++) {
+                        for (uint8_t ch = 0; ch < rxStrings_v[i].length(); ch++) {//Convert string to upper case
                             txMsg += toupper(rxStrings_v[i].at(ch));
                         }
                     } else {
@@ -333,10 +331,11 @@ void *clientHandlerThread(void *clientSocket) {
                                 converter.str(rxStrings_v[i]);
                                 int sampleRate;
                                 if (converter >> sampleRate) {
-                                    setSensorSampleRate(sensorNo, sampleRate);
+                                    setSensorSampleRate(sensorNo, sampleRate);//This is a thread safe function
                                     txMsg += "Sensor name: " + sensorList[sensorNo].sensorName + ENDL;
-                                    txMsg += "Sensor No: " + sensorList[sensorNo].sensorNo_str +ENDL;
+                                    txMsg += "Sensor No: " + sensorList[sensorNo].sensorNo_str + ENDL;
                                     txMsg += "now has sample rate  ";
+                                    //No need to convert number again, we know it's OK at this point. Cheating hehe :-D
                                     txMsg += rxStrings_v[i] + ENDL;
 
                                 } else {
@@ -372,7 +371,7 @@ void *clientHandlerThread(void *clientSocket) {
                             txMsg += "Sensor No: " + sensorList[sensorNo].sensorNo_str + ENDL;
                             txMsg += "Is now INACTIVE" + ENDL;
                         } else {
-                            txMsg += "ERROR: Stop sensor '" + rxStrings_v[i - 1] +
+                            txMsg += "ERROR: Stop sensor '" + rxStrings_v[i - 1] +//Tell them whats wrong
                                     "' is not a number! Pull yourself together!" + ENDL + ENDL;
                             txMsg += REMOTE_USAGE;
                             break;
@@ -403,7 +402,7 @@ void *clientHandlerThread(void *clientSocket) {
                         txMsg += REMOTE_USAGE;
                         break;
                     }
-                } else if (rxStrings_v[i] == GET_BOARD_STATUS) {
+                } else if (rxStrings_v[i] == GET_BOARD_STATUS) {//TODO: make this a bit more interesting
                     txMsg += getTime();
                 } else {
                     txMsg += "ERROR: Wrong cmd received" + ENDL + ENDL;
@@ -416,25 +415,26 @@ void *clientHandlerThread(void *clientSocket) {
         if (bytesSent != txMsg.length())std::cout << "Send error. Bytes lost";
     }
 
-    close(thisClientData->socketDescripter);
+    close(thisClientData->socketDescripter);//Close this socket 
+    //Lock for updating the thread list
     pthread_mutex_lock(&lock);
-    log << "Closing from: " << inet_ntoa(thisClientData->clientAddr.sin_addr) << ENDL;
-    freeThreadSlots[thisClientData->threadId] = true;
-    threadCount--;
+    cout << "Closing from: " << inet_ntoa(thisClientData->clientAddr.sin_addr) << ENDL;
+    freeThreadSlots[thisClientData->threadId] = true;//This slot is now open 
+    threadCount--;//One les thread is now running 
     pthread_mutex_unlock(&lock);
-    pthread_exit(NULL);
+    pthread_exit(NULL);//Close down this thread
 }
-
 
 /**
  * A thread for polling the sensors at the sample-rate interval specified  for ech sensor.
- * Set the resolution for the polling in at the "SAMPLE_RESOLUTION_ms" define
+ * Set the resolution for the polling at the "SAMPLE_RESOLUTION_ms" define
  * @param void* for pthread
  * @return void* for pthread 
  */
 void *sensorHandler(void *arg) {
     for (;;) {
-        //Set the sleep time in nano sec. This needs a funky struct to work, thats why its a bit strange
+        //Set the sleep time in nano sec. This needs a funky struct to work, 
+        //thats why its a bit strange
         nanosleep((struct timespec[]) {
             {0, 10000 * SAMPLE_RESOLUTION_ms}
         }, NULL);
@@ -442,10 +442,12 @@ void *sensorHandler(void *arg) {
         //Go trough sensor list to see if its time to sample the specific sensor
         for (uint8_t i = 0; i < SENSOR_AMOUNT; i++) {
             if (sensorList[i].isActive && sensorList[i].counter++ >= sensorList[i].smapleRate) {
-                sensorList[i].counter = 0;
+                sensorList[i].counter = 0; //No need to lock this 
+                pthread_mutex_lock(&lock); //Lock so none is reading while we update the values
                 sensorList[i].timeStamp = getTime();
                 //Call with struct No. to be sure values is consistent (i and number can be different)
                 sensorList[i].sensorValue = readSensor(sensorList[i].sensorNo);
+                pthread_mutex_unlock(&lock);
             }
         }
     }
@@ -456,10 +458,10 @@ void *sensorHandler(void *arg) {
  */
 void initSensors() {
     sensorList[0].sensorName = "Temp-Sensor";
-    sensorList[0].sensorNo = 0;//For internal function calls
-    sensorList[0].sensorNo_str = "0";//Both str and int val to ease the TCP responds
+    sensorList[0].sensorNo = 0; //For internal function calls
+    sensorList[0].sensorNo_str = "0"; //Both str and int val to ease the TCP responds
     sensorList[0].sensorValue = 0;
-    sensorList[0].smapleRate = 1000;//Times the "SAMPLE_RESOLUTION_ms" 
+    sensorList[0].smapleRate = 1000; //Times the "SAMPLE_RESOLUTION_ms" 
     sensorList[0].counter = 0;
     sensorList[0].isActive = true;
 
@@ -496,7 +498,6 @@ void initSensors() {
     sensorList[4].isActive = true;
 }
 
-
 /**
  * Main 
  * @param argc
@@ -506,8 +507,11 @@ void initSensors() {
 int main(int argc, char** argv) {
 
     initSensors();
-
+    
+    //Collection of client data. Each thread need one for a safe location in mem
     ClientData_s clientData[EXPECTED_CLIENTS] = {0};
+    
+    //Threads used in this program
     pthread_t threads[EXPECTED_CLIENTS];
     pthread_t sensorPollingThread;
 
@@ -515,24 +519,26 @@ int main(int argc, char** argv) {
     int32_t socketId = 0;
 
     //  args_v[0] = &ipAddresForThisServer;
-    args_v[0] = &portNrForThisServer;//Argument from user 
+    args_v[0] = &portNrForThisServer; //Argument from user 
 
     //For holding and filling socket struct's 
     struct addrinfo hostInfo;
     struct addrinfo* hostInfoList;
 
+    //Clean 
     memset(&hostInfo, 0, sizeof (hostInfo));
     memset(&freeThreadSlots, true, sizeof (freeThreadSlots));
 
 
     //================== Argument Checks ===================
+    //See ProgArg_s files for the args used here 
     if (argc < EXPECTED_NO_OF_ARGS || argc > EXPECTED_NO_OF_ARGS) {
         cout << "Wrong number of arguments" << ENDL;
         cout << USAGE << ENDL;
         return false;
     }
 
-    // O(n^2)   :-)
+    // O(n^2) 
     for (uint8_t i = 0; i < args_v.size(); i++) {//Get arguments  
         uint8_t j;
         for (j = 1; j < argc; j++) {//0.arg is always path. Don't check that 
@@ -552,7 +558,8 @@ int main(int argc, char** argv) {
     }
     //=============== Argument Checks finished ==================
 
-    //For Socket initalisation at 
+    //For Socket initialization see 
+    //http://codebase.eu/tutorial/linux-socket-programming-c/ 
 
     //Address info : address = Address field unspecifed (both IPv4 & 6)
     hostInfo.ai_addr = AF_UNSPEC;
@@ -565,14 +572,13 @@ int main(int argc, char** argv) {
     //getaddrinfo is used to get info for the socket.
     //Null: use local host. Port no is set by user args (5555)
     errorCode = getaddrinfo(NULL, portNrForThisServer.getParamVal().c_str(), &hostInfo, &hostInfoList);
-    if (errorCode != 0) 
+    if (errorCode != 0)
         cout << "getaddrinfo error" << gai_strerror(errorCode);
-
 
     //Make a socket and returns a socket descriptor. 
     //All info comes from 'getaddrinfo' --> into the struct 'hostInfoList'
     socketId = socket(hostInfoList->ai_family, hostInfoList->ai_socktype, hostInfoList->ai_protocol);
-    if (socketId == -1) 
+    if (socketId == -1)
         cout << "Socket error" << strerror(errno);
 
     //Socket options is set to reuse the add: http://pubs.opengroup.org/onlinepubs/7908799/xns/setsockopt.html
@@ -585,37 +591,39 @@ int main(int argc, char** argv) {
         cout << "Bind error" << strerror(errno);
 
     errorCode = listen(socketId, EXPECTED_CLIENTS);
-    if (errorCode == -1) 
+    if (errorCode == -1)
         cout << "Listen error" << strerror(errno);
 
     freeaddrinfo(hostInfoList); //Not needed anymore
 
     //Make thread for polling the sensors
     pthread_create(&sensorPollingThread, NULL, sensorHandler, NULL);
-
+    
     for (;;) {
         if (threadCount < EXPECTED_CLIENTS) {
-
-            cout << "Waiting for incoming data.... Hooooold it ! .... Hooold it!!!" << ENDL;
-            int newIncommingSocket = 0;
-            struct sockaddr_in incommingAddr;
-            socklen_t addrSize = sizeof (incommingAddr);
+            int newIncommingSocket = 0; //New socket ID
+            struct sockaddr_in incommingAddr; //New socket address info
+            socklen_t addrSize = sizeof (incommingAddr); //The size of the address
+            //Wait for a client to connect. PROGRAM BLOCKS HERE UNTIL CLIENTS CONNECT 
             newIncommingSocket = accept(socketId, (struct sockaddr*) &incommingAddr, &addrSize);
-            if (newIncommingSocket == -1) std::cout << "Accept error" << strerror(errno);
+            if (newIncommingSocket == -1) std::cout << "Accept error" << strerror(errno); //Check for errors
             else {
+                //Show the incoming IP in readable txt
                 cout << "Connection accepted. From : " << inet_ntoa(incommingAddr.sin_addr) << ENDL;
+                //Find a free slot for this client
                 for (uint8_t freeSlot = 0; freeSlot < EXPECTED_CLIENTS; freeSlot++) {
                     if (freeThreadSlots[freeSlot]) {
-
+                        //Free slot found. Lock for thread safe updating of the thread list
                         pthread_mutex_lock(&lock);
-                        freeThreadSlots[freeSlot] = false;
+                        freeThreadSlots[freeSlot] = false; //This slot is now taken
                         threadCount++;
                         pthread_mutex_unlock(&lock);
-
-                        clientData[freeSlot].threadId = freeSlot;
-                        clientData[freeSlot].clientAddr = incommingAddr;
-                        clientData[freeSlot].socketDescripter = newIncommingSocket;
-
+                        //Copy info to safe location before parsing to new thread
+                        //These structs holds info about the client for the thread to service
+                        clientData[freeSlot].threadId = freeSlot; //What slot does this thread have
+                        clientData[freeSlot].clientAddr = incommingAddr; //This cleint address
+                        clientData[freeSlot].socketDescripter = newIncommingSocket; //This clients socket
+                        //Make the new thread and parse the info struct as void pointer
                         pthread_create(&threads[freeSlot], NULL, clientHandlerThread, static_cast<void*> (&clientData[freeSlot]));
                         break;
                     }
@@ -624,8 +632,5 @@ int main(int argc, char** argv) {
         }
 
     }
-
-
-
     return 0;
 }
